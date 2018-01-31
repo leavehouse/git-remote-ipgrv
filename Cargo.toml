@@ -1,0 +1,10 @@
+[package]
+name = "git-remote-ipgrv"
+version = "0.0.1"
+authors = ["leavehouse <heavelouse@gmail.com>"]
+
+[dependencies]
+chrono = "0.4.0"
+fern = "0.5.2"
+git2 = "0.6.11"
+log = "0.4.1"

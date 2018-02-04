@@ -1,13 +1,18 @@
 extern crate chrono;
 extern crate fern;
 extern crate git2;
+extern crate home;
+extern crate lmdb_zero as lmdb;
 #[macro_use] extern crate log;
-
-use std::{env, process};
+extern crate ipld_git;
+extern crate reqwest;
 
 use commands::process_commands;
+use std::{env, process};
 
+mod ipfs_api;
 mod commands;
+mod helper;
 
 fn setup_logger() -> Result<(), fern::InitError> {
    fern::Dispatch::new()
@@ -29,18 +34,18 @@ fn setup_logger() -> Result<(), fern::InitError> {
 fn main() {
    let args: Vec<String> = env::args().collect();
    if args.len() !=  3 {
-       println!("Usage: git-remote-ipgrv <remote> <url>");
+       eprintln!("Usage: git-remote-ipgrv <remote> <url>");
        process::exit(1);
    }
 
    if let Err(e) = setup_logger() {
-       println!("Error setting up logger: {:?}", e);
+       eprintln!("Error setting up logger: {:?}", e);
        process::exit(1);
    }
    debug!("{:?}", args);
 
    if let Err(e) = process_commands() {
-       println!("Error processing: {:?}", e);
+       eprintln!("Error processing: {:?}", e);
        process::exit(1);
    }
 }

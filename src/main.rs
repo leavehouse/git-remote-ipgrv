@@ -6,6 +6,7 @@ extern crate lmdb_zero as lmdb;
 #[macro_use] extern crate log;
 extern crate ipld_git;
 extern crate reqwest;
+extern crate url;
 
 use commands::process_commands;
 use std::{env, process};

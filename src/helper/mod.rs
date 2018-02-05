@@ -4,14 +4,23 @@ use std::env;
 use std::fs;
 use std::io;
 
+use ipfs_api;
+
 mod tracker;
 
 #[derive(Debug)]
 pub enum Error {
+    ApiError(ipfs_api::Error),
     EnvVarError(env::VarError),
     Git2Error(git2::Error),
     IoError(io::Error),
     LmdbError(lmdb::Error),
+}
+
+impl From<ipfs_api::Error> for Error {
+    fn from(e: ipfs_api::Error) -> Self {
+        Error::ApiError(e)
+    }
 }
 
 impl From<env::VarError> for Error {
@@ -96,7 +105,6 @@ impl Helper {
         // TODO: check tracker for src_hash.
         // if it exists, return, because theres no need to push
         // else, push
-        unimplemented!();
         // TODO: set `dest` to `src's hash in the tracekr
 
         // read the git object into memory
@@ -104,6 +112,26 @@ impl Helper {
         let odb_obj = odb.read(src_hash)?;
         let raw_obj = odb_obj.data();
 
+        let mut full_obj = Vec::with_capacity(raw_obj.len() + 12);
+        match odb_obj.kind() {
+            git2::ObjectType::Blob => full_obj.extend_from_slice(b"blob "),
+            git2::ObjectType::Tree => full_obj.extend_from_slice(b"tree "),
+            git2::ObjectType::Commit => full_obj.extend_from_slice(b"commit "),
+            git2::ObjectType::Tag => full_obj.extend_from_slice(b"tag "),
+            _ => unimplemented!(),
+        }
+        full_obj.extend_from_slice(format!("{}", raw_obj.len()).as_bytes());
+        full_obj.push(0);
+        full_obj.extend_from_slice(raw_obj);
+
         // `put` the git object bytes onto the ipfs DAG.
+        let api = ipfs_api::Shell::new_local()?;
+        api.dag_put(&full_obj, "raw", "git")?;
+
+        // TODO: parse CID, add to tracker
+
+        // TODO: process all the objects that are linked to from the object
+        // just pushed
+        unimplemented!();
     }
 }

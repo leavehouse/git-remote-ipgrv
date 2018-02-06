@@ -82,14 +82,17 @@ impl Shell {
         let part = Part::reader(Cursor::new(data.to_vec()))
             .mime(reqwest::mime::APPLICATION_OCTET_STREAM);
         let form = Form::new().part("", part);
+
         let mut req_builder = self.client.post(request_url);
 
         req_builder.header(TransferEncoding::chunked());
 
         req_builder.multipart(form);
+
         let resp = req_builder.send()
             .map_err(|e| format!("Error sending request: {}", e))?;
 
-        unimplemented!()
+        debug!("      dag_put, response = {:?}", resp);
+        Ok(())
     }
 }

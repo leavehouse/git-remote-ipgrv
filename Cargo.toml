@@ -8,8 +8,10 @@ chrono = "0.4.0"
 fern = "0.5.2"
 git2 = "0.6.11"
 home = "0.3.0"
-ipld-git = { git = "git://github.com/leavehouse/rust-ipld-git" }
+#ipld-git = { git = "git://github.com/leavehouse/rust-ipld-git" }
+ipld-git = { path = "../rust-ipld-git" }
 lmdb-zero = "0.4.1"
 log = "0.4.1"
+multihash = "0.7.0"
 reqwest = "0.8.4"
 url = "1.6.0"

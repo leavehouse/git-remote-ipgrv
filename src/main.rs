@@ -5,6 +5,7 @@ extern crate home;
 extern crate lmdb_zero as lmdb;
 #[macro_use] extern crate log;
 extern crate ipld_git;
+extern crate multihash;
 extern crate reqwest;
 extern crate url;
 

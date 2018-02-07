@@ -1,7 +1,6 @@
 use home;
 use reqwest;
 use url;
-use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::{Cursor, Read};
@@ -48,7 +47,6 @@ impl Shell {
     }
 
     pub fn new_local() -> Result<Shell, Error> {
-        let client = reqwest::Client::new();
         let mut api_path = ipfs_data_dir_path()?;
         api_path.push(API_FILE_NAME);
 
@@ -68,8 +66,7 @@ impl Shell {
 
     pub fn dag_put(&self, data: &[u8], input_enc: &str, format: &str) -> Result<(), Error> {
         use reqwest::multipart::{Part, Form};
-        use reqwest::header::{ContentDisposition, DispositionParam, DispositionType,
-                              TransferEncoding};
+        use reqwest::header::{TransferEncoding};
 
         // TODO: construct equivalent of `Request` in go-ipfs-api
         let command = "dag/put";

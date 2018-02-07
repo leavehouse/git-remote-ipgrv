@@ -15,4 +15,30 @@ impl Tracker {
             env, None, &lmdb::DatabaseOptions::defaults()).unwrap();
         Ok(Tracker { db: db })
     }
+
+    // `hash` should be the SHA-1 digest, a 20-byte-slice
+    pub fn has_entry(&self, hash: &[u8]) -> Result<bool, lmdb::Error> {
+        let env = self.db.env();
+        let txn = lmdb::ReadTransaction::new(env)?;
+        let access = txn.access();
+        match access.get::<_, ()>(&self.db, hash) {
+            Ok(_) => Ok(true),
+            Err(e) => match e {
+                lmdb::Error::Code(lmdb::error::NOTFOUND) => Ok(false),
+                _ => Err(e),
+            }
+        }
+    }
+
+    pub fn add_entry(&self, hash: &[u8]) -> Result<(), lmdb::Error> {
+        let env = self.db.env();
+        let txn = lmdb::WriteTransaction::new(env)?;
+
+        {
+            let mut access = txn.access();
+            access.put(&self.db, hash, &(), lmdb::put::Flags::empty())?;
+        }
+
+        txn.commit()
+    }
 }

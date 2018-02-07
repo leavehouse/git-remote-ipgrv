@@ -109,7 +109,7 @@ impl Helper {
         let src_hash: git2::Oid = src_ref.target().unwrap();
         debug!("    pushing, hash = {}", src_hash);
 
-        let mut push_helper = PushHelper::new(&self.repo);
+        let mut push_helper = PushHelper::new(&self.repo, &self.tracker);
         push_helper.push(src_hash)?;
 
         // TODO: the go version invokes `Tracker.SetRef` here, look more closely
@@ -120,12 +120,17 @@ impl Helper {
 
 struct PushHelper<'a> {
     queue: VecDeque<git2::Oid>,
-    repo: &'a git2::Repository
+    repo: &'a git2::Repository,
+    tracker: &'a tracker::Tracker,
 }
 
 impl<'a> PushHelper<'a> {
-    fn new(repo: &'a git2::Repository) -> PushHelper<'a> {
-        PushHelper { queue: VecDeque::new(), repo: repo }
+    fn new(repo: &'a git2::Repository, tracker: &'a tracker::Tracker) -> PushHelper<'a> {
+        PushHelper {
+            queue: VecDeque::new(),
+            repo: repo,
+            tracker: tracker,
+        }
     }
 
     fn push(&mut self, hash: git2::Oid) -> Result<(), Error>{
@@ -137,14 +142,15 @@ impl<'a> PushHelper<'a> {
     fn push_queue(&mut self) -> Result<(), Error> {
         while let Some(oid) = self.queue.pop_front() {
             debug!("    pushing oid = {}", oid);
-            // TODO: check tracker for src_hash.
-            // if it exists, return, because theres no need to push
-            // else, push
-            // TODO: set `dest` to `src's hash in the tracekr
-            //
+
+            if self.tracker.has_entry(oid.as_bytes())? {
+                debug!("    already have this oid, skipping");
+                continue;
+            }
+
             let obj_bytes = self.push_object(oid)?;
 
-            // TODO: parse CID, add to tracker
+            self.tracker.add_entry(oid.as_bytes())?;
 
             self.enqueue_links(&obj_bytes)?;
         }
@@ -187,6 +193,10 @@ impl<'a> PushHelper<'a> {
         for link in node.links() {
             let link_multihash = multihash::decode(&link.cid.hash)?;
             debug!("        link digest: {:?}", link_multihash.digest);
+            if self.tracker.has_entry(link_multihash.digest)? {
+                debug!("        already have this link, skipping");
+                continue;
+            }
             self.queue.push_back(git2::Oid::from_bytes(link_multihash.digest)?)
         }
         Ok(())

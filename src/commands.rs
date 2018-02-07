@@ -1,3 +1,5 @@
+use hex;
+use ipld_git;
 use std::io;
 
 use helper;
@@ -26,11 +28,18 @@ fn log_and_print(s: &str) {
    println!("{}", s);
 }
 
+struct PushArgs {
+    pub src: String,
+    pub dest: String,
+    pub force: bool,
+}
+
 // Listen for commands coming in over stdin, respond to them by writing to
 // stdout.
 pub fn process_commands() -> Result<(), ProcessError> {
    let helper = helper::Helper::new()?;
    let stdin = io::stdin();
+   let mut push_batch = Vec::new();
    debug!("processing commands");
    loop {
        let mut command_line = String::new();
@@ -60,19 +69,22 @@ pub fn process_commands() -> Result<(), ProcessError> {
            let src_dest = &command[5..];
 
            let refs = src_dest.split(":").collect::<Vec<_>>();
-           helper.push(refs[0], refs[1], src_dest.starts_with("+"))?;
-
-           eprintln!("Hey, so we got a PUSH command and are about to panic");
-           unimplemented!()
+           push_batch.push(PushArgs {
+               src: refs[0].to_string(),
+               dest: refs[1].to_string(),
+               force: src_dest.starts_with("+"),
+           });
        } else if command == "" {
-           // TODO: this is technically wrong for the blank command to be
-           // separate. What actually happens is git sends one or more batches
-           // of `push` commands, each batch terminated by a blank command.
-           // However, I'm not aware of any other command using blank lines,
-           // so it is most convenient to separate it out like this. Also, 
-           // currently we're just pushing things as they come rather than 
-           // batching pushes together, since I don't see what difference it
-           // makes.
+           for PushArgs { src, dest, force } in push_batch {
+               let src_hash = helper.push(&src, &dest, force)?;
+               eprintln!("Pushed to IPFS as:  ipld::{}", hex::encode(&src_hash));
+               eprintln!("Head CID is {}", ipld_git::util::sha1_to_cid(&src_hash).unwrap());
+               log_and_print(&format!("ok {}", src));
+           }
+           log_and_print("");
+           // TODO: don't return here? need to find some way to check if
+           // if no more commands are coming
+           return Ok(())
        } else {
            return Err(ProcessError::InvalidCommand(command.to_string()))
        }

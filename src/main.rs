@@ -1,6 +1,7 @@
 extern crate chrono;
 extern crate fern;
 extern crate git2;
+extern crate hex;
 extern crate home;
 extern crate lmdb_zero as lmdb;
 #[macro_use] extern crate log;

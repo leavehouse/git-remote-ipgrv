@@ -89,7 +89,6 @@ impl Shell {
         let resp = req_builder.send()
             .map_err(|e| format!("Error sending request: {}", e))?;
 
-        debug!("      dag_put, response = {:?}", resp);
         Ok(())
     }
 }

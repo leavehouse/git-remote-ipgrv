@@ -86,12 +86,9 @@ impl Helper {
 
         let head_ref = self.repo.find_reference("HEAD")?;
         let head_ref_type = head_ref.kind()
-                                .expect("HEAD ref type is unknown");
+                                    .expect("HEAD ref type is unknown");
         let head_target = match head_ref_type {
-            git2::ReferenceType::Oid => {
-                debug!("    head is oid");
-                format!("{}", head_ref.target().unwrap())
-            },
+            git2::ReferenceType::Oid => format!("{}", head_ref.target().unwrap()),
             git2::ReferenceType::Symbolic =>
                 head_ref.symbolic_target()
                         .expect("HEAD symbolic target is not utf-8")
@@ -103,7 +100,8 @@ impl Helper {
     }
 
     // `src` is the local ref being pushed, `dest` is the remote ref?
-    pub fn push(&self, src: &str, dest: &str, force: bool) -> Result<(), Error> {
+    // Returns the hash that `src` points to
+    pub fn push(&self, src: &str, dest: &str, force: bool) -> Result<Vec<u8>, Error> {
         // get reference associated with `src`, then get src's hash
         let src_ref = self.repo.find_reference(src)?.resolve()?;
         let src_hash: git2::Oid = src_ref.target().unwrap();
@@ -111,10 +109,7 @@ impl Helper {
 
         let mut push_helper = PushHelper::new(&self.repo, &self.tracker);
         push_helper.push(src_hash)?;
-
-        // TODO: the go version invokes `Tracker.SetRef` here, look more closely
-        // at that
-        unimplemented!();
+        Ok(src_hash.as_bytes().to_vec())
     }
 }
 

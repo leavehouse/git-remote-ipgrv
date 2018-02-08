@@ -15,7 +15,6 @@ use std::{env, process};
 
 mod ipfs_api;
 mod remote;
-mod helper;
 
 fn setup_logger() -> Result<(), fern::InitError> {
    fern::Dispatch::new()
@@ -47,10 +46,13 @@ fn main() {
    }
    debug!("{:?}", args);
 
-   let remote = Remote;
-
-   if let Err(e) = remote.process_commands() {
-       eprintln!("Error processing: {:?}", e);
+   if let Err(e) = run(args.into_iter().nth(3).unwrap()) {
+       eprintln!("Error running helper: {:?}", e);
        process::exit(1);
    }
+}
+
+fn run(remote_hash: String) -> Result<(), remote::Error> {
+   let remote = Remote::new()?;
+   remote.process_commands()
 }

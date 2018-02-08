@@ -1,4 +1,5 @@
 use git2;
+use hex;
 use ipld_git;
 use lmdb;
 use multihash;
@@ -20,6 +21,7 @@ pub enum Error {
     LmdbError(lmdb::Error),
     IpldGitError(ipld_git::Error),
     MultihashError(multihash::Error),
+    InvalidCommand(String),
 }
 
 impl From<env::VarError> for Error {
@@ -52,23 +54,34 @@ impl From<multihash::Error> for Error {
     }
 }
 
-pub struct Helper {
+fn log_and_print(s: &str) {
+   debug!("git <- '{}'", s);
+   println!("{}", s);
+}
+
+struct PushArgs {
+    pub src: String,
+    pub dest: String,
+    pub force: bool,
+}
+
+pub struct Remote {
     repo: git2::Repository,
     tracker: tracker::Tracker,
 }
 
-impl Helper {
-    pub fn new() -> Result<Helper, Error> {
+impl Remote {
+    pub fn new() -> Result<Remote, Error> {
         let repo = git2::Repository::open_from_env()?;
 
         let mut db_path = env::var("GIT_DIR")?;
         // TODO: for windows, convert to std::path::Path, use join(), convert back to string?
         db_path.push_str("/ipgrv");
         fs::create_dir_all(&db_path)?;
-        debug!("Helper::new(), db_path = {}", &db_path);
+        debug!("Remote::new(), db_path = {}", &db_path);
         let tracker = tracker::Tracker::new(&db_path)?;
 
-        Ok(Helper {
+        Ok(Remote {
             repo: repo,
             tracker: tracker,
         })
@@ -110,6 +123,62 @@ impl Helper {
         let mut push_helper = PushHelper::new(&self.repo, &self.tracker);
         push_helper.push(src_hash)?;
         Ok(src_hash.as_bytes().to_vec())
+    }
+
+    // Listen for commands coming in over stdin, respond to them by writing to
+    // stdout.
+    pub fn process_commands(&self) -> Result<(), Error> {
+       let stdin = io::stdin();
+       let mut push_batch = Vec::new();
+       debug!("processing commands");
+       loop {
+           let mut command_line = String::new();
+           stdin.read_line(&mut command_line)?;
+           let command = command_line.trim_matches('\n');
+
+           debug!(" -> {}", command);
+
+           if command == "capabilities" {
+               // "Lists the capabilities of the helper, one per line, ending with
+               // a blank line."
+               log_and_print("push");
+               log_and_print("");
+           } else if command.starts_with("list") {
+               // list -
+               // "Lists the refs, one per line, in the format '<value> <name>
+               // [<attr> ...]'. The value may be a hex sha1 hash, '@<dest>' for a
+               // symref, or '?' to indicate that the helper could not get the value
+               // of the ref."
+               //
+               // list for-push -
+               // used to prepare for a `git push`
+               let refs = self.list()?;
+               refs.iter().for_each(|r| log_and_print(r));
+               log_and_print("");
+           } else if command.starts_with("push ") {
+               let src_dest = &command[5..];
+
+               let refs = src_dest.split(":").collect::<Vec<_>>();
+               push_batch.push(PushArgs {
+                   src: refs[0].to_string(),
+                   dest: refs[1].to_string(),
+                   force: src_dest.starts_with("+"),
+               });
+           } else if command == "" {
+               for PushArgs { src, dest, force } in push_batch {
+                   let src_hash = self.push(&src, &dest, force)?;
+                   eprintln!("Pushed to IPFS as:  ipld::{}", hex::encode(&src_hash));
+                   eprintln!("Head CID is {}", ipld_git::util::sha1_to_cid(&src_hash).unwrap());
+                   log_and_print(&format!("ok {}", src));
+               }
+               log_and_print("");
+               // TODO: don't return here? need to find some way to check if
+               // if no more commands are coming
+               return Ok(())
+           } else {
+               return Err(Error::InvalidCommand(command.to_string()))
+           }
+       }
     }
 }
 

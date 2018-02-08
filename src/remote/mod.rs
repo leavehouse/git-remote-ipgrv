@@ -19,10 +19,20 @@ fn log_and_print(s: &str) {
    println!("{}", s);
 }
 
+enum Command {
+    Push(PushArgs),
+    Fetch(FetchArgs),
+}
+
 struct PushArgs {
     pub src: String,
     pub dest: String,
     pub force: bool,
+}
+
+struct FetchArgs {
+    hash: String,
+    ref_name: String,
 }
 
 pub struct Remote {
@@ -47,7 +57,7 @@ impl Remote {
         })
     }
 
-    pub fn list(&self) -> Result<Vec<String>, Error> {
+    pub fn list(&self, handler: &Handler) -> Result<Vec<String>, Error> {
         let mut refs = Vec::new();
         let local_branches = self.repo.branches(Some(git2::BranchType::Local))?;
         for branch_result in local_branches {
@@ -57,18 +67,24 @@ impl Remote {
                                             .expect("Branch name is not utf-8")));
         }
 
-        let head_ref = self.repo.find_reference("HEAD")?;
-        let head_ref_type = head_ref.kind()
-                                    .expect("HEAD ref type is unknown");
-        let head_target = match head_ref_type {
-            git2::ReferenceType::Oid => format!("{}", head_ref.target().unwrap()),
-            git2::ReferenceType::Symbolic =>
-                head_ref.symbolic_target()
-                        .expect("HEAD symbolic target is not utf-8")
-                        .to_string(),
-        };
+        // For a `git clone` there is (in general) no git directory, so we must
+        // consult the hash passed into the program
+        if refs.len() == 0 {
+            refs.push(format!("{} refs/heads/master", handler.remote_hash()))
+        } else {
+            let head_ref = self.repo.find_reference("HEAD")?;
+            let head_ref_type = head_ref.kind()
+                                        .expect("HEAD ref type is unknown");
+            let head_target = match head_ref_type {
+                git2::ReferenceType::Oid => format!("{}", head_ref.target().unwrap()),
+                git2::ReferenceType::Symbolic =>
+                    head_ref.symbolic_target()
+                            .expect("HEAD symbolic target is not utf-8")
+                            .to_string(),
+            };
 
-        refs.push(format!("{} HEAD", head_target));
+            refs.push(format!("{} HEAD", head_target));
+        }
         Ok(refs)
     }
 
@@ -87,9 +103,9 @@ impl Remote {
 
     // Listen for commands coming in over stdin, respond to them by writing to
     // stdout.
-    pub fn process_commands(&self) -> Result<(), Error> {
+    pub fn process_commands(&mut self, handler: &Handler) -> Result<(), Error> {
        let stdin = io::stdin();
-       let mut push_batch = Vec::new();
+       let mut command_batch = Vec::new();
        debug!("processing commands");
        loop {
            let mut command_line = String::new();
@@ -102,6 +118,7 @@ impl Remote {
                // "Lists the capabilities of the helper, one per line, ending with
                // a blank line."
                log_and_print("push");
+               log_and_print("fetch");
                log_and_print("");
            } else if command.starts_with("list") {
                // list -
@@ -112,24 +129,27 @@ impl Remote {
                //
                // list for-push -
                // used to prepare for a `git push`
-               let refs = self.list()?;
+               let refs = self.list(handler)?;
                refs.iter().for_each(|r| log_and_print(r));
                log_and_print("");
            } else if command.starts_with("push ") {
                let src_dest = &command[5..];
-
                let refs = src_dest.split(":").collect::<Vec<_>>();
-               push_batch.push(PushArgs {
+               command_batch.push(Command::Push(PushArgs {
                    src: refs[0].to_string(),
                    dest: refs[1].to_string(),
                    force: src_dest.starts_with("+"),
-               });
+               }));
+           } else if command.starts_with("fetch ") {
+               let params = &command[5..];
+               let parts = params.split(" ").collect::<Vec<_>>();
+               command_batch.push(Command::Fetch(FetchArgs {
+                   hash: parts[0].to_string(),
+                   ref_name: parts[1].to_string(),
+               }));
            } else if command == "" {
-               for PushArgs { src, dest, force } in push_batch {
-                   let src_hash = self.push(&src, &dest, force)?;
-                   eprintln!("Pushed to IPFS as:  ipld::{}", hex::encode(&src_hash));
-                   eprintln!("Head CID is {}", ipld_git::util::sha1_to_cid(&src_hash).unwrap());
-                   log_and_print(&format!("ok {}", src));
+               for command in command_batch {
+                   self.perform_batched_command(command)?;
                }
                log_and_print("");
                // TODO: don't return here? need to find some way to check if
@@ -139,6 +159,34 @@ impl Remote {
                return Err(Error::InvalidCommand(command.to_string()))
            }
        }
+    }
+
+    fn perform_batched_command(&mut self, command: Command) -> Result<(), Error> {
+        match command {
+           Command::Push(PushArgs { src, dest, force }) => {
+               let src_hash = self.push(&src, &dest, force)?;
+               eprintln!("Pushed to IPFS as:  ipld::{}",
+                         hex::encode(&src_hash));
+               eprintln!("Head CID is {}",
+                         ipld_git::util::sha1_to_cid(&src_hash).unwrap());
+               log_and_print(&format!("ok {}", src));
+               Ok(())
+           },
+           Command::Fetch(args) => unimplemented!(),
+        }
+    }
+}
+
+pub struct Handler {
+    remote_hash: String,
+}
+
+impl Handler {
+    pub fn new(hash: String) -> Handler {
+        Handler { remote_hash: hash }
+    }
+    pub fn remote_hash(&self) -> &str {
+        &self.remote_hash
     }
 }
 

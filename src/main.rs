@@ -46,7 +46,7 @@ fn main() {
    }
    debug!("{:?}", args);
 
-   if let Err(e) = run(args.into_iter().nth(3).unwrap()) {
+   if let Err(e) = run(args.into_iter().nth(2).unwrap()) {
        eprintln!("Error running helper: {:?}", e);
        process::exit(1);
    }

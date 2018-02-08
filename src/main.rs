@@ -10,11 +10,11 @@ extern crate multihash;
 extern crate reqwest;
 extern crate url;
 
-use commands::process_commands;
+use remote::Remote;
 use std::{env, process};
 
 mod ipfs_api;
-mod commands;
+mod remote;
 mod helper;
 
 fn setup_logger() -> Result<(), fern::InitError> {
@@ -47,7 +47,9 @@ fn main() {
    }
    debug!("{:?}", args);
 
-   if let Err(e) = process_commands() {
+   let remote = Remote;
+
+   if let Err(e) = remote.process_commands() {
        eprintln!("Error processing: {:?}", e);
        process::exit(1);
    }

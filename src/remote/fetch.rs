@@ -28,7 +28,6 @@ impl<'a> FetchHelper<'a> {
 
     // `hash` is a hex representation of the hash being fetched
     pub fn fetch(&mut self, hash: String) -> Result<(), Error>{
-        debug!("    FetchHelper::fetch, hash = {}", hash);
         self.queue.push_back(hash);
         self.fetch_queue()
     }

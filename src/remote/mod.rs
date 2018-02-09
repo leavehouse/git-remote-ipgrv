@@ -60,9 +60,15 @@ impl Remote {
         let local_branches = self.repo.branches(Some(git2::BranchType::Local))?;
         for branch_result in local_branches {
             let (branch, _) = branch_result?;
-            refs.push(format!("? {}", branch.get()
-                                            .name()
-                                            .expect("Branch name is not utf-8")));
+
+            let ref_name = branch.get().name().expect("Branch name is not utf-8");
+
+            let ref_value = match self.tracker.get_ref(ref_name)? {
+                Some(val) => val,
+                None => String::from("?"),
+            };
+
+            refs.push(format!("{} {}", ref_value, ref_name));
         }
 
         // For a `git clone` there is (in general) no git directory, so we must
@@ -100,7 +106,8 @@ impl Remote {
     fn fetch(&self, hash: String, ref_name: String) -> Result<(), Error> {
         debug!("    fetching, hash = {}, ref_name = {}", hash, ref_name);
         let mut fetch_helper = fetch::FetchHelper::new(&self.tracker);
-        fetch_helper.fetch(hash)?;
+        fetch_helper.fetch(hash.clone())?;
+        self.tracker.set_ref(&ref_name, &hash)?;
         Ok(())
     }
 

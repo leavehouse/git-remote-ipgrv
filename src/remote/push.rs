@@ -29,6 +29,7 @@ impl<'a> PushHelper<'a> {
 
     // push each of the objects in the queue into IPFS (as IPLD).
     fn push_queue(&mut self) -> Result<(), Error> {
+        let api = ipfs_api::Shell::new_local().map_err(Error::ApiError)?;
         while let Some(oid) = self.queue.pop_front() {
             debug!("    pushing oid = {}", oid);
 
@@ -37,7 +38,7 @@ impl<'a> PushHelper<'a> {
                 continue;
             }
 
-            let obj_bytes = self.push_object(oid)?;
+            let obj_bytes = self.push_object(oid, &api)?;
 
             self.tracker.add_entry(oid.as_bytes())?;
 
@@ -48,7 +49,7 @@ impl<'a> PushHelper<'a> {
 
     // Push git object into ipfs, returning the vector of bytes of the raw git
     // object.
-    fn push_object(&mut self, oid: git2::Oid) -> Result<Vec<u8>, Error> {
+    fn push_object(&mut self, oid: git2::Oid, api: &ipfs_api::Shell) -> Result<Vec<u8>, Error> {
         // read the git object into memory
         let odb = self.repo.odb()?;
         let odb_obj = odb.read(oid)?;
@@ -67,7 +68,6 @@ impl<'a> PushHelper<'a> {
         full_obj.extend_from_slice(raw_obj);
 
         // `put` the git object bytes onto the ipfs DAG.
-        let api = ipfs_api::Shell::new_local().map_err(Error::ApiError)?;
         api.dag_put(&full_obj, "raw", "git").map_err(Error::ApiError)?;
         Ok(full_obj)
     }

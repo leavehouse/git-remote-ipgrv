@@ -100,6 +100,7 @@ impl Remote {
 
         let mut push_helper = push::PushHelper::new(&self.repo, &self.tracker);
         push_helper.push(src_hash)?;
+        self.tracker.set_ref(&dest, &format!("{}", src_hash))?;
         Ok(src_hash.as_bytes().to_vec())
     }
 

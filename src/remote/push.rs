@@ -73,17 +73,11 @@ impl<'a> PushHelper<'a> {
     }
 
     fn enqueue_links(&mut self, obj_bytes: &[u8]) -> Result<(), Error> {
-        //let node = ipld_git::parse_object(obj_bytes).map_err(Error::IpldGitError)?;
-        let node = match ipld_git::parse_object(obj_bytes) {
-            Err(e) => return Err(Error::IpldGitError(e)),
-            Ok(node) => node,
-        };
+        let node = ipld_git::parse_object(obj_bytes).map_err(Error::IpldGitError)?;
 
         for link in node.links() {
             let link_multihash = multihash::decode(&link.cid.hash)?;
-            debug!("        link digest: {:?}", link_multihash.digest);
             if self.tracker.has_entry(link_multihash.digest)? {
-                debug!("        already have this link, skipping");
                 continue;
             }
             self.queue.push_back(git2::Oid::from_bytes(link_multihash.digest)?)

@@ -1,5 +1,6 @@
 extern crate chrono;
 extern crate fern;
+extern crate flate2;
 extern crate git2;
 extern crate hex;
 extern crate home;

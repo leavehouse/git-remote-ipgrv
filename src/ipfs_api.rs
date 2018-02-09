@@ -68,13 +68,9 @@ impl Shell {
         use reqwest::multipart::{Part, Form};
         use reqwest::header::{TransferEncoding};
 
-        // TODO: construct equivalent of `Request` in go-ipfs-api
         let command = "dag/put";
-        let base_url = format!("{}/api/v0/{}", self.url, command);
         let params = &[("input-enc", input_enc), ("format", format)];
-        let request_url = url::Url::parse_with_params(&base_url, params)
-            .map_err(|e| format!("Error building request URL: {}", e))?;
-
+        let request_url = self.make_request_url(command, params)?;
 
         let part = Part::reader(Cursor::new(data.to_vec()))
             .mime(reqwest::mime::APPLICATION_OCTET_STREAM);
@@ -86,9 +82,32 @@ impl Shell {
 
         req_builder.multipart(form);
 
-        let resp = req_builder.send()
+        req_builder.send()
             .map_err(|e| format!("Error sending request: {}", e))?;
 
         Ok(())
+    }
+
+    pub fn block_get(&self, path: &str) -> Result<Vec<u8>, Error> {
+        let command = "block/get";
+        let params = &[("arg", path)];
+        let request_url = self.make_request_url(command, params)?;
+
+        let mut resp = self.client.post(request_url)
+                                  .send()
+                                  .map_err(|e| format!("Error sending request: {}",
+                                                       e))?;
+        let mut buf = Vec::new();
+        resp.copy_to(&mut buf)
+            .map_err(|e| format!("Error reading body: {:?}", e))?;
+        Ok(buf)
+    }
+
+    fn make_request_url(
+        &self, command: &str, params: &[(&str, &str)]
+    ) -> Result<url::Url, Error> {
+        let base_url = format!("{}/api/v0/{}", self.url, command);
+        url::Url::parse_with_params(&base_url, params)
+            .map_err(|e| format!("Error building request URL: {}", e))
     }
 }

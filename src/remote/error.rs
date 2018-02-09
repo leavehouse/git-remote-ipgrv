@@ -1,4 +1,5 @@
 use git2;
+use hex;
 use ipld_git;
 use lmdb;
 use multihash;
@@ -11,6 +12,7 @@ use ipfs_api;
 pub enum Error {
     ApiError(ipfs_api::Error),
     EnvVarError(env::VarError),
+    FromHexError(hex::FromHexError),
     Git2Error(git2::Error),
     IoError(io::Error),
     LmdbError(lmdb::Error),
@@ -22,6 +24,12 @@ pub enum Error {
 impl From<env::VarError> for Error {
     fn from(e: env::VarError) -> Self {
         Error::EnvVarError(e)
+    }
+}
+
+impl From<hex::FromHexError> for Error {
+    fn from(e: hex::FromHexError) -> Self {
+        Error::FromHexError(e)
     }
 }
 

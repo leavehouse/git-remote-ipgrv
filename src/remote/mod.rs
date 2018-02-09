@@ -1,7 +1,6 @@
 use git2;
 use hex;
 use ipld_git;
-use lmdb;
 use std::env;
 use std::fs;
 use std::io;
@@ -9,6 +8,7 @@ use std::io;
 pub use self::error::Error;
 
 mod error;
+mod fetch;
 mod push;
 mod tracker;
 
@@ -69,20 +69,18 @@ impl Remote {
         // consult the hash passed into the program
         if refs.len() == 0 {
             refs.push(format!("{} refs/heads/master", handler.remote_hash()))
-        } else {
-            let head_ref = self.repo.find_reference("HEAD")?;
-            let head_ref_type = head_ref.kind()
-                                        .expect("HEAD ref type is unknown");
-            let head_target = match head_ref_type {
-                git2::ReferenceType::Oid => format!("{}", head_ref.target().unwrap()),
-                git2::ReferenceType::Symbolic =>
-                    head_ref.symbolic_target()
-                            .expect("HEAD symbolic target is not utf-8")
-                            .to_string(),
-            };
-
-            refs.push(format!("{} HEAD", head_target));
         }
+        let head_ref = self.repo.find_reference("HEAD")?;
+        let head_ref_type = head_ref.kind()
+                                    .expect("HEAD ref type is unknown");
+        let head_ref_string = match head_ref_type {
+            git2::ReferenceType::Oid => format!("{} HEAD", head_ref.target().unwrap()),
+            git2::ReferenceType::Symbolic => format!("@{} HEAD",
+                head_ref.symbolic_target()
+                        .expect("HEAD symbolic target is not utf-8")
+                        .to_string()),
+        };
+        refs.push(head_ref_string);
         Ok(refs)
     }
 
@@ -97,6 +95,13 @@ impl Remote {
         let mut push_helper = push::PushHelper::new(&self.repo, &self.tracker);
         push_helper.push(src_hash)?;
         Ok(src_hash.as_bytes().to_vec())
+    }
+
+    fn fetch(&self, hash: String, ref_name: String) -> Result<(), Error> {
+        debug!("    fetching, hash = {}, ref_name = {}", hash, ref_name);
+        let mut fetch_helper = fetch::FetchHelper::new(&self.tracker);
+        fetch_helper.fetch(hash)?;
+        Ok(())
     }
 
     // Listen for commands coming in over stdin, respond to them by writing to
@@ -131,7 +136,7 @@ impl Remote {
                refs.iter().for_each(|r| log_and_print(r));
                log_and_print("");
            } else if command.starts_with("push ") {
-               let src_dest = &command[5..];
+               let src_dest = &command[(4+1)..];
                let refs = src_dest.split(":").collect::<Vec<_>>();
                command_batch.push(Command::Push(PushArgs {
                    src: refs[0].to_string(),
@@ -139,7 +144,7 @@ impl Remote {
                    force: src_dest.starts_with("+"),
                }));
            } else if command.starts_with("fetch ") {
-               let params = &command[5..];
+               let params = &command[(5+1)..];
                let parts = params.split(" ").collect::<Vec<_>>();
                command_batch.push(Command::Fetch(FetchArgs {
                    hash: parts[0].to_string(),
@@ -149,9 +154,16 @@ impl Remote {
                for command in command_batch {
                    self.perform_batched_command(command)?;
                }
+               // TODO: it's weird because for push, each push
+               // should return an "ok" or "error" message, but for fetches
+               // there's just a single blank line that's output. Consequence
+               // of conflating two separate things here: blank line terminates
+               // both a push batch and a fetch batch. Should probably separate
+               // these two out
                log_and_print("");
-               // TODO: don't return here? need to find some way to check if
-               // if no more commands are coming
+               // TODO: don't return here? see above, but specifically you can
+               // have multiple push batches. returning here does not handle
+               // this correctly
                return Ok(())
            } else {
                return Err(Error::InvalidCommand(command.to_string()))
@@ -168,10 +180,12 @@ impl Remote {
                eprintln!("Head CID is {}",
                          ipld_git::util::sha1_to_cid(&src_hash).unwrap());
                log_and_print(&format!("ok {}", src));
-               Ok(())
            },
-           Command::Fetch(args) => unimplemented!(),
+           Command::Fetch(FetchArgs { hash, ref_name }) => {
+               self.fetch(hash, ref_name)?;
+           },
         }
+        Ok(())
     }
 }
 

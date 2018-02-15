@@ -38,7 +38,8 @@ impl Shell {
         let parts = addr[1..].split('/').collect::<Vec<_>>();
         if parts.len() != 4 || parts[0] != "ip4" || parts[2] != "tcp" {
             return Err("Shell::new takes a multiaddr of the form \
-                        '/ip4/<ip>/tcp/<port>'".to_string())
+                        '/ip4/<ip>/tcp/<port>'"
+                .to_string());
         }
         Ok(Shell {
             client: reqwest::Client::new(),
@@ -58,15 +59,21 @@ impl Shell {
             .map_err(|e| format!("Error opening file: {}", e))?;
 
         let mut addr = String::new();
-        api_file.read_to_string(&mut addr)
-                .map_err(|e| format!("Error reading file: {}", e))?;
+        api_file
+            .read_to_string(&mut addr)
+            .map_err(|e| format!("Error reading file: {}", e))?;
 
         Shell::new(addr.trim())
     }
 
-    pub fn dag_put(&self, data: &[u8], input_enc: &str, format: &str) -> Result<(), Error> {
-        use reqwest::multipart::{Part, Form};
-        use reqwest::header::{TransferEncoding};
+    pub fn dag_put(
+        &self,
+        data: &[u8],
+        input_enc: &str,
+        format: &str,
+    ) -> Result<(), Error> {
+        use reqwest::multipart::{Form, Part};
+        use reqwest::header::TransferEncoding;
 
         let command = "dag/put";
         let params = &[("input-enc", input_enc), ("format", format)];
@@ -82,7 +89,8 @@ impl Shell {
 
         req_builder.multipart(form);
 
-        req_builder.send()
+        req_builder
+            .send()
             .map_err(|e| format!("Error sending request: {}", e))?;
 
         Ok(())
@@ -93,10 +101,10 @@ impl Shell {
         let params = &[("arg", path)];
         let request_url = self.make_request_url(command, params)?;
 
-        let mut resp = self.client.post(request_url)
-                                  .send()
-                                  .map_err(|e| format!("Error sending request: {}",
-                                                       e))?;
+        let mut resp = self.client
+            .post(request_url)
+            .send()
+            .map_err(|e| format!("Error sending request: {}", e))?;
         let mut buf = Vec::new();
         resp.copy_to(&mut buf)
             .map_err(|e| format!("Error reading body: {:?}", e))?;
@@ -104,7 +112,9 @@ impl Shell {
     }
 
     fn make_request_url(
-        &self, command: &str, params: &[(&str, &str)]
+        &self,
+        command: &str,
+        params: &[(&str, &str)],
     ) -> Result<url::Url, Error> {
         let base_url = format!("{}/api/v0/{}", self.url, command);
         url::Url::parse_with_params(&base_url, params)

@@ -13,8 +13,8 @@ mod push;
 mod tracker;
 
 fn log_and_print(s: &str) {
-   debug!("git <- '{}'", s);
-   println!("{}", s);
+    debug!("git <- '{}'", s);
+    println!("{}", s);
 }
 
 enum Command {
@@ -61,7 +61,8 @@ impl Remote {
         for branch_result in local_branches {
             let (branch, _) = branch_result?;
 
-            let ref_name = branch.get().name().expect("Branch name is not utf-8");
+            let ref_name =
+                branch.get().name().expect("Branch name is not utf-8");
 
             let ref_value = match self.tracker.get_ref(ref_name)? {
                 Some(val) => val,
@@ -77,14 +78,18 @@ impl Remote {
             refs.push(format!("{} refs/heads/master", handler.remote_hash()))
         }
         let head_ref = self.repo.find_reference("HEAD")?;
-        let head_ref_type = head_ref.kind()
-                                    .expect("HEAD ref type is unknown");
+        let head_ref_type = head_ref.kind().expect("HEAD ref type is unknown");
         let head_ref_string = match head_ref_type {
-            git2::ReferenceType::Oid => format!("{} HEAD", head_ref.target().unwrap()),
-            git2::ReferenceType::Symbolic => format!("@{} HEAD",
-                head_ref.symbolic_target()
-                        .expect("HEAD symbolic target is not utf-8")
-                        .to_string()),
+            git2::ReferenceType::Oid => {
+                format!("{} HEAD", head_ref.target().unwrap())
+            }
+            git2::ReferenceType::Symbolic => format!(
+                "@{} HEAD",
+                head_ref
+                    .symbolic_target()
+                    .expect("HEAD symbolic target is not utf-8")
+                    .to_string()
+            ),
         };
         refs.push(head_ref_string);
         Ok(refs)
@@ -92,7 +97,12 @@ impl Remote {
 
     // `src` is the local ref being pushed, `dest` is the remote ref?
     // Returns the hash that `src` points to
-    fn push(&self, src: &str, dest: &str, force: bool) -> Result<Vec<u8>, Error> {
+    fn push(
+        &self,
+        src: &str,
+        dest: &str,
+        force: bool,
+    ) -> Result<Vec<u8>, Error> {
         // get reference associated with `src`, then get src's hash
         let src_ref = self.repo.find_reference(src)?.resolve()?;
         let src_hash: git2::Oid = src_ref.target().unwrap();
@@ -115,83 +125,90 @@ impl Remote {
     // Listen for commands coming in over stdin, respond to them by writing to
     // stdout.
     pub fn process_commands(&mut self, handler: &Handler) -> Result<(), Error> {
-       let stdin = io::stdin();
-       let mut command_batch = Vec::new();
-       debug!("processing commands");
-       loop {
-           let mut command_line = String::new();
-           stdin.read_line(&mut command_line)?;
-           let command = command_line.trim_matches('\n');
+        let stdin = io::stdin();
+        let mut command_batch = Vec::new();
+        debug!("processing commands");
+        loop {
+            let mut command_line = String::new();
+            stdin.read_line(&mut command_line)?;
+            let command = command_line.trim_matches('\n');
 
-           debug!(" -> {}", command);
+            debug!(" -> {}", command);
 
-           if command == "capabilities" {
-               // "Lists the capabilities of the helper, one per line, ending with
-               // a blank line."
-               log_and_print("push");
-               log_and_print("fetch");
-               log_and_print("");
-           } else if command.starts_with("list") {
-               // list -
-               // "Lists the refs, one per line, in the format '<value> <name>
-               // [<attr> ...]'. The value may be a hex sha1 hash, '@<dest>' for a
-               // symref, or '?' to indicate that the helper could not get the value
-               // of the ref."
-               //
-               // list for-push -
-               // used to prepare for a `git push`
-               let refs = self.list(handler)?;
-               refs.iter().for_each(|r| log_and_print(r));
-               log_and_print("");
-           } else if command.starts_with("push ") {
-               let src_dest = &command[(4+1)..];
-               let refs = src_dest.split(":").collect::<Vec<_>>();
-               command_batch.push(Command::Push(PushArgs {
-                   src: refs[0].to_string(),
-                   dest: refs[1].to_string(),
-                   force: src_dest.starts_with("+"),
-               }));
-           } else if command.starts_with("fetch ") {
-               let params = &command[(5+1)..];
-               let parts = params.split(" ").collect::<Vec<_>>();
-               command_batch.push(Command::Fetch(FetchArgs {
-                   hash: parts[0].to_string(),
-                   ref_name: parts[1].to_string(),
-               }));
-           } else if command == "" {
-               for command in command_batch {
-                   self.perform_batched_command(command)?;
-               }
-               // TODO: it's weird because for push, each push
-               // should return an "ok" or "error" message, but for fetches
-               // there's just a single blank line that's output. Consequence
-               // of conflating two separate things here: blank line terminates
-               // both a push batch and a fetch batch. Should probably separate
-               // these two out
-               log_and_print("");
-               // TODO: don't return here? see above, but specifically you can
-               // have multiple push batches. returning here does not handle
-               // this correctly
-               return Ok(())
-           } else {
-               return Err(Error::InvalidCommand(command.to_string()))
-           }
-       }
+            if command == "capabilities" {
+                // "Lists the capabilities of the helper, one per line, ending with
+                // a blank line."
+                log_and_print("push");
+                log_and_print("fetch");
+                log_and_print("");
+            } else if command.starts_with("list") {
+                // list -
+                // "Lists the refs, one per line, in the format '<value> <name>
+                // [<attr> ...]'. The value may be a hex sha1 hash, '@<dest>' for a
+                // symref, or '?' to indicate that the helper could not get the value
+                // of the ref."
+                //
+                // list for-push -
+                // used to prepare for a `git push`
+                let refs = self.list(handler)?;
+                refs.iter().for_each(|r| log_and_print(r));
+                log_and_print("");
+            } else if command.starts_with("push ") {
+                let src_dest = &command[(4 + 1)..];
+                let refs = src_dest.split(":").collect::<Vec<_>>();
+                command_batch.push(Command::Push(PushArgs {
+                    src: refs[0].to_string(),
+                    dest: refs[1].to_string(),
+                    force: src_dest.starts_with("+"),
+                }));
+            } else if command.starts_with("fetch ") {
+                let params = &command[(5 + 1)..];
+                let parts = params.split(" ").collect::<Vec<_>>();
+                command_batch.push(Command::Fetch(FetchArgs {
+                    hash: parts[0].to_string(),
+                    ref_name: parts[1].to_string(),
+                }));
+            } else if command == "" {
+                for command in command_batch {
+                    self.perform_batched_command(command)?;
+                }
+                // TODO: it's weird because for push, each push
+                // should return an "ok" or "error" message, but for fetches
+                // there's just a single blank line that's output. Consequence
+                // of conflating two separate things here: blank line terminates
+                // both a push batch and a fetch batch. Should probably separate
+                // these two out
+                log_and_print("");
+                // TODO: don't return here? see above, but specifically you can
+                // have multiple push batches. returning here does not handle
+                // this correctly
+                return Ok(());
+            } else {
+                return Err(Error::InvalidCommand(command.to_string()));
+            }
+        }
     }
 
-    fn perform_batched_command(&mut self, command: Command) -> Result<(), Error> {
+    fn perform_batched_command(
+        &mut self,
+        command: Command,
+    ) -> Result<(), Error> {
         match command {
-           Command::Push(PushArgs { src, dest, force }) => {
-               let src_hash = self.push(&src, &dest, force)?;
-               eprintln!("Pushed to IPFS as:  ipld::{}",
-                         hex::encode(&src_hash));
-               eprintln!("Head CID is {}",
-                         ipld_git::util::sha1_to_cid(&src_hash).unwrap());
-               log_and_print(&format!("ok {}", src));
-           },
-           Command::Fetch(FetchArgs { hash, ref_name }) => {
-               self.fetch(hash, ref_name)?;
-           },
+            Command::Push(PushArgs { src, dest, force }) => {
+                let src_hash = self.push(&src, &dest, force)?;
+                eprintln!(
+                    "Pushed to IPFS as:  ipld::{}",
+                    hex::encode(&src_hash)
+                );
+                eprintln!(
+                    "Head CID is {}",
+                    ipld_git::util::sha1_to_cid(&src_hash).unwrap()
+                );
+                log_and_print(&format!("ok {}", src));
+            }
+            Command::Fetch(FetchArgs { hash, ref_name }) => {
+                self.fetch(hash, ref_name)?;
+            }
         }
         Ok(())
     }

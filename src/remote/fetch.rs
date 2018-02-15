@@ -5,7 +5,7 @@ use ipld_git;
 use multihash;
 use std::collections::VecDeque;
 use std::env;
-use std::fs::{File, create_dir_all};
+use std::fs::{create_dir_all, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -27,7 +27,7 @@ impl<'a> FetchHelper<'a> {
     }
 
     // `hash` is a hex representation of the hash being fetched
-    pub fn fetch(&mut self, hash: String) -> Result<(), Error>{
+    pub fn fetch(&mut self, hash: String) -> Result<(), Error> {
         self.queue.push_back(hash);
         self.fetch_queue()
     }
@@ -56,9 +56,8 @@ impl<'a> FetchHelper<'a> {
             // add all linked objects to the queue to be fetched next
             self.enqueue_links(&obj_bytes)?;
 
-
-            let mut enc = ZlibEncoder::new(Vec::new(),
-                                           flate2::Compression::default());
+            let mut enc =
+                ZlibEncoder::new(Vec::new(), flate2::Compression::default());
             enc.write(&obj_bytes)?;
             let compressed_bytes = enc.finish()?;
 
@@ -71,7 +70,8 @@ impl<'a> FetchHelper<'a> {
     }
 
     fn enqueue_links(&mut self, obj_bytes: &[u8]) -> Result<(), Error> {
-        let node = ipld_git::parse_object(obj_bytes).map_err(Error::IpldGitError)?;
+        let node =
+            ipld_git::parse_object(obj_bytes).map_err(Error::IpldGitError)?;
 
         for link in node.links() {
             let link_multihash = multihash::decode(&link.cid.hash)?;
@@ -85,7 +85,10 @@ impl<'a> FetchHelper<'a> {
 // hash of its data. Objects are stored as individual files. The files are
 // sharded into separate directories based on the first byte of the hash
 // (e.g. object with hash 'fa937...' is stored at '.git/objects/fa/937...')
-fn prepare_object_path<'a>(path: &'a mut PathBuf, hash: &str) -> Result<&'a Path, Error> {
+fn prepare_object_path<'a>(
+    path: &'a mut PathBuf,
+    hash: &str,
+) -> Result<&'a Path, Error> {
     debug!("      prepare_object_path start, hash = {}", hash);
     let hash_dir = &hash[..2];
     path.push(hash_dir);

@@ -14,7 +14,10 @@ pub struct PushHelper<'a> {
 }
 
 impl<'a> PushHelper<'a> {
-    pub fn new(repo: &'a git2::Repository, tracker: &'a tracker::Tracker) -> PushHelper<'a> {
+    pub fn new(
+        repo: &'a git2::Repository,
+        tracker: &'a tracker::Tracker,
+    ) -> PushHelper<'a> {
         PushHelper {
             queue: VecDeque::new(),
             repo: repo,
@@ -22,7 +25,7 @@ impl<'a> PushHelper<'a> {
         }
     }
 
-    pub fn push(&mut self, hash: git2::Oid) -> Result<(), Error>{
+    pub fn push(&mut self, hash: git2::Oid) -> Result<(), Error> {
         self.queue.push_back(hash);
         self.push_queue()
     }
@@ -49,7 +52,11 @@ impl<'a> PushHelper<'a> {
 
     // Push git object into ipfs, returning the vector of bytes of the raw git
     // object.
-    fn push_object(&mut self, oid: git2::Oid, api: &ipfs_api::Shell) -> Result<Vec<u8>, Error> {
+    fn push_object(
+        &mut self,
+        oid: git2::Oid,
+        api: &ipfs_api::Shell,
+    ) -> Result<Vec<u8>, Error> {
         // read the git object into memory
         let odb = self.repo.odb()?;
         let odb_obj = odb.read(oid)?;
@@ -68,19 +75,22 @@ impl<'a> PushHelper<'a> {
         full_obj.extend_from_slice(raw_obj);
 
         // `put` the git object bytes onto the ipfs DAG.
-        api.dag_put(&full_obj, "raw", "git").map_err(Error::ApiError)?;
+        api.dag_put(&full_obj, "raw", "git")
+            .map_err(Error::ApiError)?;
         Ok(full_obj)
     }
 
     fn enqueue_links(&mut self, obj_bytes: &[u8]) -> Result<(), Error> {
-        let node = ipld_git::parse_object(obj_bytes).map_err(Error::IpldGitError)?;
+        let node =
+            ipld_git::parse_object(obj_bytes).map_err(Error::IpldGitError)?;
 
         for link in node.links() {
             let link_multihash = multihash::decode(&link.cid.hash)?;
             if self.tracker.has_entry(link_multihash.digest)? {
                 continue;
             }
-            self.queue.push_back(git2::Oid::from_bytes(link_multihash.digest)?)
+            self.queue
+                .push_back(git2::Oid::from_bytes(link_multihash.digest)?)
         }
         Ok(())
     }

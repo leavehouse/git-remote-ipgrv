@@ -4,9 +4,10 @@ extern crate flate2;
 extern crate git2;
 extern crate hex;
 extern crate home;
-extern crate lmdb_zero as lmdb;
-#[macro_use] extern crate log;
 extern crate ipld_git;
+extern crate lmdb_zero as lmdb;
+#[macro_use]
+extern crate log;
 extern crate multihash;
 extern crate reqwest;
 extern crate url;
@@ -36,7 +37,7 @@ fn setup_logger() -> Result<(), fern::InitError> {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() !=  3 {
+    if args.len() != 3 {
         eprintln!("Usage: git-remote-ipgrv <remote> <url>");
         process::exit(1);
     }
